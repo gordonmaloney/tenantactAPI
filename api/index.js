@@ -1,14 +1,15 @@
+// index.js
 import express from "express";
 
 const app = express();
-
 app.set("trust proxy", true);
 
-app.get("/", (_req, res) => {
+// Basic routes
+app.get("/api", (_req, res) => {
   res.type("text/plain").send("OK");
 });
 
-app.get("/v1/healthz", (_req, res) => {
+app.get("/api/healthz", (_req, res) => {
   res.json({
     ok: true,
     uptime: process.uptime(),
@@ -16,11 +17,11 @@ app.get("/v1/healthz", (_req, res) => {
   });
 });
 
-// --- only start server if run directly (not by Vercel) ---
+// Start locally (Vercel will ignore this and use default export)
 if (process.env.VERCEL === undefined) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`✅ API running locally on http://localhost:${PORT}`);
+    console.log(`✅ API running at http://localhost:${PORT}/api`);
   });
 }
 
