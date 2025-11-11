@@ -2,14 +2,8 @@
 
 import crypto from "crypto";
 import { getDb } from "./_db.js";
+import { setCors } from "./_cors.js";
 
-function setCors(res) {
-  // ⚠️ Permissive — for dev only
-  res.setHeader("Access-Control-Allow-Origin", "*"); // allow any origin
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Max-Age", "86400"); // cache preflight 24h
-}
 
 function getClientIp(req) {
   const xff = req.headers["x-forwarded-for"];
