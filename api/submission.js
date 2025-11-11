@@ -3,6 +3,13 @@
 import crypto from "crypto";
 import { getDb } from "./_db.js";
 
+function setCors(res) {
+  // ⚠️ Permissive — for dev only
+  res.setHeader("Access-Control-Allow-Origin", "*"); // allow any origin
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400"); // cache preflight 24h
+}
 
 function getClientIp(req) {
   const xff = req.headers["x-forwarded-for"];
@@ -71,6 +78,14 @@ function encryptObjectStringsShallow(obj) {
 /* ------------------------------ Handler -------------------------------- */
 
 export default async function handler(req, res) {
+    setCors(res);
+
+    if (req.method === "OPTIONS") {
+      // Preflight request
+      res.statusCode = 204;
+      return res.end();
+    }
+    
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Allow", "POST");
@@ -189,7 +204,7 @@ export function useSubmitter({ campaignId, contactDeets, testimonial }) {
 }
 
 
-useTracker({
+useSubmitter({
 campaignId: "test",
 contactDeets: {"name": "john doe", "email": "x@y.com", "number": "123"},
 testimonial: ["a", "b"]
