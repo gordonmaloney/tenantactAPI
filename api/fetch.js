@@ -99,7 +99,7 @@ export default async function handler(req, res) {
             number: maskNumber(cd.number ?? cd.phone),
           }
         : undefined;
-      return { ...e, contactDeets: masked }; // return masked
+      return { ...e, contactDeets: cd }; // return masked
     });
 
     res.setHeader("content-type", "application/json");
