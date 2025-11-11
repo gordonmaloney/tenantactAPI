@@ -4,7 +4,6 @@ import crypto from "crypto";
 import { getDb } from "./_db.js";
 import { setCors } from "./_cors.js";
 
-
 function getClientIp(req) {
   const xff = req.headers["x-forwarded-for"];
   if (typeof xff === "string" && xff.length) return xff.split(",")[0].trim();
@@ -14,9 +13,11 @@ function getClientIp(req) {
 function hashIp(ip) {
   const salt = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const secret = process.env.IP_HASH_SECRET || "";
-  return crypto.createHash("sha256").update(ip + secret + salt).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(ip + secret + salt)
+    .digest("hex");
 }
-
 
 const ENC_KEY_B64 = process.env.PIIFIELD_KEY || ""; // must be 32 bytes (base64)
 const HMAC_KEY_B64 = process.env.PII_HMAC_KEY || "";
@@ -29,13 +30,19 @@ function requireKey(buf, name) {
 }
 
 const ENC_KEY = requireKey(Buffer.from(ENC_KEY_B64, "base64"), "PIIFIELD_KEY");
-const HMAC_KEY = requireKey(Buffer.from(HMAC_KEY_B64, "base64"), "PII_HMAC_KEY");
+const HMAC_KEY = requireKey(
+  Buffer.from(HMAC_KEY_B64, "base64"),
+  "PII_HMAC_KEY"
+);
 
 function encryptField(plaintext) {
   if (plaintext == null) return undefined;
   const iv = crypto.randomBytes(12); // GCM recommended 96-bit IV
   const cipher = crypto.createCipheriv("aes-256-gcm", ENC_KEY, iv);
-  const ct = Buffer.concat([cipher.update(String(plaintext), "utf8"), cipher.final()]);
+  const ct = Buffer.concat([
+    cipher.update(String(plaintext), "utf8"),
+    cipher.final(),
+  ]);
   const tag = cipher.getAuthTag();
   return {
     alg: "AES-256-GCM",
@@ -72,14 +79,14 @@ function encryptObjectStringsShallow(obj) {
 /* ------------------------------ Handler -------------------------------- */
 
 export default async function handler(req, res) {
-    setCors(res);
+  setCors(req, res);
 
-    if (req.method === "OPTIONS") {
-      // Preflight request
-      res.statusCode = 204;
-      return res.end();
-    }
-    
+  if (req.method === "OPTIONS") {
+    // Preflight request
+    res.statusCode = 204;
+    return res.end();
+  }
+
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Allow", "POST");
@@ -92,7 +99,9 @@ export default async function handler(req, res) {
     if (!body) {
       const chunks = [];
       for await (const c of req) chunks.push(c);
-      body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
+      body = chunks.length
+        ? JSON.parse(Buffer.concat(chunks).toString("utf8"))
+        : {};
     }
 
     // Minimal validation
@@ -110,31 +119,38 @@ export default async function handler(req, res) {
 
     // Build lookup hashes for common keys (optional but very useful)
     const email_hash =
-      contactDeetsRaw && contactDeetsRaw.email ? hmacId(contactDeetsRaw.email) : undefined;
+      contactDeetsRaw && contactDeetsRaw.email
+        ? hmacId(contactDeetsRaw.email)
+        : undefined;
     const phone_hash =
       contactDeetsRaw && (contactDeetsRaw.number || contactDeetsRaw.phone)
         ? hmacId(contactDeetsRaw.number ?? contactDeetsRaw.phone)
         : undefined;
 
     // Encrypt string fields (shallow) for at-rest protection
-    const contactDeets =
-      contactDeetsRaw ? encryptObjectStringsShallow(contactDeetsRaw) : undefined;
+    const contactDeets = contactDeetsRaw
+      ? encryptObjectStringsShallow(contactDeetsRaw)
+      : undefined;
 
     if (!site || !path) {
       res.statusCode = 400;
       res.setHeader("content-type", "application/json");
-      return res.end(JSON.stringify({ error: "missing_fields", need: ["site", "path"] }));
+      return res.end(
+        JSON.stringify({ error: "missing_fields", need: ["site", "path"] })
+      );
     }
 
     const db = await getDb();
 
     // Indexes: ts for sort; typical filters for analytics; hashes for lookup
-    await db.collection("events").createIndexes([
-      { key: { ts: -1 } },
-      { key: { site: 1, type: 1, campaignId: 1 } },
-      { key: { email_hash: 1 } },
-      { key: { phone_hash: 1 } },
-    ]);
+    await db
+      .collection("events")
+      .createIndexes([
+        { key: { ts: -1 } },
+        { key: { site: 1, type: 1, campaignId: 1 } },
+        { key: { email_hash: 1 } },
+        { key: { phone_hash: 1 } },
+      ]);
 
     const ip = getClientIp(req);
     const doc = {
@@ -142,10 +158,10 @@ export default async function handler(req, res) {
       site,
       path,
       campaignId,
-      testimonial,           // do NOT stringify; keep as-is
-      contactDeets,          // encrypted strings inside
-      email_hash,            // deterministic hash for lookups
-      phone_hash,            // deterministic hash for lookups
+      testimonial, // do NOT stringify; keep as-is
+      contactDeets, // encrypted strings inside
+      email_hash, // deterministic hash for lookups
+      phone_hash, // deterministic hash for lookups
       ts: new Date(),
       ref: req.headers.referer || req.headers.referrer || undefined,
       userAgent: req.headers["user-agent"],
@@ -164,7 +180,6 @@ export default async function handler(req, res) {
     return res.end(JSON.stringify({ error: "server_error" }));
   }
 }
-
 
 /*
 EXAMPLE CALL:
