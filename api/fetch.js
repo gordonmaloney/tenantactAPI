@@ -2,18 +2,19 @@
 import { getDb } from "./_db.js";
 import crypto from "crypto";
 
-/* ----------------- setup ----------------- */
-
 const PASSWORD = process.env.PASSWORD;
-const ENC_KEY = Buffer.from(process.env.PIIFIELD_KEY, "base64");
-if (ENC_KEY.length !== 32) {
-  throw new Error("PIIFIELD_KEY must be a base64-encoded 32-byte key");
+
+// ---- helpers ----
+function getEncKey() {
+  const b64 = (process.env.PIIFIELD_KEY || "").trim();
+  if (!b64) throw new Error("Missing PIIFIELD_KEY");
+  const key = Buffer.from(b64, "base64");
+  if (key.length !== 32)
+    throw new Error("PIIFIELD_KEY must be base64 32 bytes");
+  return key;
 }
 
-/* ----------------- helpers ----------------- */
-
-// decrypt a single field
-function decryptField(enc) {
+function decryptField(enc, ENC_KEY) {
   if (!enc || typeof enc !== "object" || !enc.ct) return enc;
   try {
     const iv = Buffer.from(enc.iv, "base64");
@@ -28,38 +29,31 @@ function decryptField(enc) {
   }
 }
 
-// decrypt shallow contactDeets
-function decryptContactDeets(obj = {}) {
+function decryptContactDeets(obj = {}, ENC_KEY) {
   if (!obj || typeof obj !== "object") return undefined;
   const out = {};
-  for (const [k, v] of Object.entries(obj)) {
-    out[k] = decryptField(v);
-  }
+  for (const [k, v] of Object.entries(obj)) out[k] = decryptField(v, ENC_KEY);
   return out;
 }
 
-// optional masking helpers
 function maskEmail(email) {
   if (!email) return undefined;
-  const [user, domain] = email.split("@");
-  if (!domain) return email;
-  const maskedUser =
-    user.length <= 2
-      ? "••"
-      : user[0] + "•".repeat(user.length - 2) + user[user.length - 1];
-  return `${maskedUser}@${domain[0]}•••`;
+  const [u, d] = String(email).split("@");
+  if (!d) return email;
+  const mu =
+    u.length <= 2 ? "••" : u[0] + "•".repeat(u.length - 2) + u[u.length - 1];
+  return `${mu}@${d[0]}•••`;
 }
+
 function maskNumber(num) {
   if (!num) return undefined;
   const digits = String(num).replace(/\D/g, "");
-  if (digits.length <= 4) return "••••";
-  return "••••" + digits.slice(-4);
+  return digits.length <= 4 ? "••••" : "••••" + digits.slice(-4);
 }
 
-/* ----------------- handler ----------------- */
-
+// ---- handler ----
 export default async function handler(req, res) {
-  // 🔒 password auth
+  // auth
   const auth = req.headers.authorization;
   if (!auth || auth !== `Bearer ${PASSWORD}`) {
     res.statusCode = 401;
@@ -71,6 +65,19 @@ export default async function handler(req, res) {
     res.statusCode = 405;
     res.setHeader("Allow", "GET");
     return res.end("Method Not Allowed");
+  }
+
+  // load key safely at request time
+  let ENC_KEY;
+  try {
+    ENC_KEY = getEncKey();
+  } catch (e) {
+    console.error("fetch_key_error", e.message);
+    res.statusCode = 500;
+    res.setHeader("content-type", "application/json");
+    return res.end(
+      JSON.stringify({ error: "server_misconfig", detail: e.message })
+    );
   }
 
   try {
@@ -86,10 +93,9 @@ export default async function handler(req, res) {
       .limit(limit)
       .toArray();
 
-    // decrypt + mask
     const decrypted = events.map((e) => {
       const cd = e.contactDeets
-        ? decryptContactDeets(e.contactDeets)
+        ? decryptContactDeets(e.contactDeets, ENC_KEY)
         : undefined;
       const masked = cd
         ? {
@@ -98,10 +104,7 @@ export default async function handler(req, res) {
             number: maskNumber(cd.number ?? cd.phone),
           }
         : undefined;
-      return {
-        ...e,
-        contactDeets: cd, // masked decrypted info
-      };
+      return { ...e, contactDeets: cd };
     });
 
     res.setHeader("content-type", "application/json");
@@ -109,7 +112,7 @@ export default async function handler(req, res) {
       JSON.stringify({ ok: true, count: decrypted.length, events: decrypted })
     );
   } catch (err) {
-    console.error("fetch_error", err);
+    console.error("fetch_error", err?.message);
     res.statusCode = 500;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({ error: "server_error" }));
@@ -118,7 +121,7 @@ export default async function handler(req, res) {
 
 //EXAMPLE HERE
 /*
-curl -X GET "http://localhost:3000/api/fetch?limit=10&site=portal" \
+curl -X GET "https://tenantactapi.vercel.app/api/fetch?limit=10&site=portal" \
   -H "Authorization: Bearer supersecretpassword123" \
   -H "Accept: application/json"
 */
