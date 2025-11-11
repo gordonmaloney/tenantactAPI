@@ -1,6 +1,7 @@
 // api/track.js
 import crypto from "crypto";
 import { getDb } from "./_db.js";
+import { setCors } from "./_cors.js";
 
 function getClientIp(req) {
   // Vercel passes through X-Forwarded-For; take the first IP
@@ -20,12 +21,19 @@ function hashIp(ip) {
 }
 
 export default async function handler(req, res) {
+  setCors(req, res);
+
+  if (req.method === "OPTIONS") {
+    // Preflight request
+    res.statusCode = 204;
+    return res.end();
+  }
+
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Allow", "POST");
     return res.end("Method Not Allowed");
   }
-
 
   try {
     let body = req.body;
