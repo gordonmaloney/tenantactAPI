@@ -21,10 +21,13 @@ function hashIp(ip) {
 }
 
 export default async function handler(req, res) {
+  // CORS first
   setCors(req, res);
 
+  res.setHeader("X-Debug-Method", req.method || "N/A");
+  res.setHeader("X-Debug-Origin", req.headers.origin || "N/A");
+
   if (req.method === "OPTIONS") {
-    // Preflight request
     res.statusCode = 204;
     return res.end();
   }
