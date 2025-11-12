@@ -40,13 +40,26 @@ export default async function handler(req, res) {
 
   try {
     let body = req.body;
-    if (!body) {
+
+    // ✅ If middleware gave us a string (e.g. text/plain beacon), parse it
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        body = {};
+      }
+    }
+
+    if (!body || typeof body !== "object") {
       // fallback for when body isn't pre-parsed
       const chunks = [];
       for await (const c of req) chunks.push(c);
-      body = chunks.length
-        ? JSON.parse(Buffer.concat(chunks).toString("utf8"))
-        : {};
+      const raw = chunks.length ? Buffer.concat(chunks).toString("utf8") : "";
+      try {
+        body = raw ? JSON.parse(raw) : {};
+      } catch {
+        body = {};
+      }
     }
 
     // Minimal validation
