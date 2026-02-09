@@ -86,8 +86,13 @@ export default async function handler(req, res) {
     const db = await getDb();
     const limit = Math.min(Number(req.query.limit) || 10, 100);
     const site = req.query.site || undefined;
+    const type = req.query.type || undefined;
+    const path = req.query.path || undefined;
 
-    const filter = site ? { site } : {};
+    let filter = {}
+    if (site) filter.site = site
+    if (type) filter.type = type
+    if (path) filter.path = path
     const events = await db
       .collection("events")
       .find(filter)
