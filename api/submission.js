@@ -114,8 +114,15 @@ export default async function handler(req, res) {
     const type = String(body.type || "submission").trim();
     const site = String(body.site || "").trim();
     const path = String(body.path || "").trim();
-    const testimonial = body.testimonial ?? undefined; // allow any shape
     const campaignId = body.campaignId ? String(body.campaignId) : undefined;
+
+    // Encrypt testimonial (string or object)
+    const testimonial =
+      typeof body.testimonial === "string"
+        ? encryptField(body.testimonial)
+        : typeof body.testimonial === "object" && body.testimonial !== null
+          ? encryptObjectStringsShallow(body.testimonial)
+          : body.testimonial;
 
     // Accept arbitrary contactDeets object, encrypt strings, keep others
     const contactDeetsRaw =
@@ -192,7 +199,7 @@ export default async function handler(req, res) {
       site,
       path,
       campaignId,
-      testimonial, // do NOT stringify; keep as-is
+      testimonial, // encrypted (string or object)
       contactDeets, // encrypted strings inside (postcode included)
       complaintDeets, // already anonymised, no encryption needed
       email_hash, // deterministic hash for lookups
@@ -216,56 +223,3 @@ export default async function handler(req, res) {
     return res.end(JSON.stringify({ error: "server_error" }));
   }
 }
-
-/*
-EXAMPLE CALL:
-
-import { useEffect } from "react";
-
-export function useSubmitter({ campaignId, contactDeets, testimonial }) {
-  useEffect(() => {
-    // guard against SSR just in case
-    if (typeof window === "undefined") return;
-
-    const type = "submission";
-    const path = window.location.pathname;
-    const site = window.location.host;
-
-    const body = { type, site, path, campaignId, testimonial, contactDeets };
-
-    (async () => {
-      try {
-        await fetch("/api/submission", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      } catch {
-        // swallow errors (as you had)
-      }
-    })();
-    // re-send if any input changes
-  }, [campaignId, testimonial, contactDeets]);
-}
-
-
-useSubmitter({
-campaignId: "test",
-contactDeets: {"name": "john doe", "email": "x@y.com", "number": "123"},
-testimonial: ["a", "b"]
-})
-*/
-
-/*
-EXAMPLE CURL
-curl -X POST "http://localhost:3000/api/submission" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "submission",
-    "site": "portal",
-    "path": "/act/12345",
-    "contactDeets": {"name": "john doe", "email": "x@y.com", "number": "123"},
-    "campaignId": "test",
-    "testimonial": "great experience"
-  }'
-*/
