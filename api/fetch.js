@@ -13,6 +13,7 @@ export default async function handler(req, res) {
   // Debug headers to confirm deployed version
   res.setHeader("X-Debug-Method", req.method || "N/A");
   res.setHeader("X-Debug-Origin", req.headers.origin || "N/A");
+  res.setHeader("X-Debug-2FA", FETCH_2FA_SECRET ? "active" : "disabled");
 
   // ✅ Preflight must bypass auth
   if (req.method === "OPTIONS") {
@@ -29,9 +30,10 @@ export default async function handler(req, res) {
   }
 
   // 🔐 2FA Check (if secret is configured)
-  if (FETCH_2FA_SECRET) {
-    const code = req.headers["x-2f-code"];
-    const verified = verifySync({ token: code || "", secret: FETCH_2FA_SECRET });
+  const secret = (FETCH_2FA_SECRET || "").trim();
+  if (secret) {
+    const code = (req.headers["x-2f-code"] || "").trim();
+    const verified = verifySync({ token: code, secret });
     if (!verified.valid) {
       res.statusCode = 401;
       res.setHeader("content-type", "application/json");
