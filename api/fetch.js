@@ -1,9 +1,10 @@
-// api/fetch.js
+import { verifySync } from "otplib";
 import { getDb } from "./_db.js";
 import crypto from "crypto";
 import { setCors } from "./_cors.js";
 
 const PASSWORD = process.env.PASSWORD;
+const FETCH_2FA_SECRET = process.env.FETCH_2FA_SECRET;
 
 export default async function handler(req, res) {
   // CORS first
@@ -25,6 +26,17 @@ export default async function handler(req, res) {
     res.statusCode = 401;
     res.setHeader("WWW-Authenticate", "Bearer");
     return res.end("Unauthorized");
+  }
+
+  // 🔐 2FA Check (if secret is configured)
+  if (FETCH_2FA_SECRET) {
+    const code = req.headers["x-2f-code"];
+    const verified = verifySync({ token: code || "", secret: FETCH_2FA_SECRET });
+    if (!verified.valid) {
+      res.statusCode = 401;
+      res.setHeader("content-type", "application/json");
+      return res.end(JSON.stringify({ error: "Invalid or missing 2FA code" }));
+    }
   }
 
   if (req.method !== "GET") {
@@ -147,6 +159,7 @@ export default async function handler(req, res) {
 //EXAMPLE HERE
 /*
 curl -X GET "https://tenantactapi.vercel.app/api/fetch?limit=10&site=portal" \
-  -H "Authorization: Bearer supersecretpassword123" \
+  -H "Authorization: Bearer YOUR_PASSWORD" \
+  -H "X-2F-Code: 123456" \
   -H "Accept: application/json"
 */
