@@ -114,9 +114,22 @@ export default async function handler(req, res) {
           }
         : undefined;
 
+      // Decrypt testimonial (encryptField or encryptObjectStringsShallow)
+      let testimonial = e.testimonial;
+      if (testimonial && typeof testimonial === "object") {
+        if (testimonial.ct) {
+          // It's a single encrypted field
+          testimonial = decryptField(testimonial, ENC_KEY);
+        } else {
+          // It's an encrypted object
+          testimonial = decryptContactDeets(testimonial, ENC_KEY); // reuse same logic
+        }
+      }
+
       return {
         ...e,
         contactDeets: cd, // 👈 includes postcode if present
+        testimonial,
       };
     });
 
