@@ -11,7 +11,8 @@ export function setCors(req, res) {
   }
   res.setHeader("Vary", "Origin"); // important for caching
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-2f-Code");
+  res.setHeader("Access-Control-Expose-Headers", "X-Debug-2FA");
   // If you will send cookies, also set:
   // res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Max-Age", "86400"); // cache preflight
