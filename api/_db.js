@@ -7,6 +7,11 @@ const dbName = process.env.MONGODB_DBNAME || "tenantact";
 // Reuse the client across invocations (serverless-safe)
 let client;
 let clientPromise;
+let testDb;
+
+export function setTestDb(db) {
+  testDb = db;
+}
 
 export function getMongoClient() {
   if (!uri) throw new Error("Missing MONGODB_URI env var");
@@ -18,6 +23,7 @@ export function getMongoClient() {
 }
 
 export async function getDb() {
+  if (testDb) return testDb;
   const cli = await getMongoClient();
   return cli.db(dbName);
 }

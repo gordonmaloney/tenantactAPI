@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "type": "module",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "express": "4.19.2",
     "mongodb": "^6.20.0",
     "otplib": "^13.3.0"
   },
   "scripts": {
     "start": "node api/index.js",
-    "dev": "node api/index.js"
+    "dev": "node api/index.js",
+    "migrate": "node scripts/migrate_auth_cases.js",
+    "test": "node --test"
   }
 }
