@@ -3,8 +3,8 @@ import { Readable } from "node:stream";
 import { beforeEach, test } from "node:test";
 import { ObjectId } from "mongodb";
 import { setTestDb } from "../api/_db.js";
-import auth from "../api/auth/[...path].js";
-import cases from "../api/cases/[...path].js";
+import auth from "../api/auth.js";
+import cases from "../api/cases.js";
 
 process.env.JWT_SECRET = "test-secret-with-at-least-thirty-two-characters";
 process.env.AUTH_RATE_LIMIT_MAX = "1000";
@@ -147,7 +147,7 @@ async function call(handler, options) {
 async function signupUser(email, password = "correct horse battery staple") {
   return call(auth, {
     method: "POST",
-    query: { path: ["signup"] },
+    query: { path: "signup" },
     body: { email, password, name: "Test User" },
   });
 }
@@ -172,7 +172,7 @@ test("signup, login, /auth/me, and protected route access", async () => {
 
   const badLogin = await call(auth, {
     method: "POST",
-    query: { path: ["login"] },
+    query: { path: "login" },
     body: { email: "user@example.com", password: "wrong-password" },
   });
   assert.equal(badLogin.status, 401);
@@ -180,17 +180,17 @@ test("signup, login, /auth/me, and protected route access", async () => {
 
   const loggedIn = await call(auth, {
     method: "POST",
-    query: { path: ["login"] },
+    query: { path: "login" },
     body: { email: "user@example.com", password: "correct horse battery staple" },
   });
   assert.equal(loggedIn.status, 200);
 
-  const denied = await call(auth, { method: "GET", query: { path: ["me"] } });
+  const denied = await call(auth, { method: "GET", query: { path: "me" } });
   assert.equal(denied.status, 401);
 
   const profile = await call(auth, {
     method: "GET",
-    query: { path: ["me"] },
+    query: { path: "me" },
     headers: { authorization: `Bearer ${loggedIn.body.token}` },
   });
   assert.equal(profile.status, 200);
@@ -200,7 +200,7 @@ test("signup, login, /auth/me, and protected route access", async () => {
 test("save, duplicate save prevention, unsave, and saved-case listing", async () => {
   const { body } = await signupUser("saves@example.com");
   const auth = { authorization: `Bearer ${body.token}` };
-  const query = { path: ["FTS", "HPC", "123", "save"] };
+  const query = { path: "FTS/HPC/123/save" };
 
   const saved = await call(cases, { method: "POST", headers: auth, query });
   assert.equal(saved.status, 200);
@@ -210,7 +210,7 @@ test("save, duplicate save prevention, unsave, and saved-case listing", async ()
   assert.equal(duplicate.status, 200);
   assert.equal(db.data.saved_cases.length, 1);
 
-  const list = await call(cases, { method: "GET", headers: auth, query: { path: ["saved"] } });
+  const list = await call(cases, { method: "GET", headers: auth, query: { path: "saved" } });
   assert.equal(list.status, 200);
   assert.equal(list.body.savedCases.length, 1);
   assert.equal(list.body.savedCases[0].caseRef, "FTS/HPC/123");
@@ -226,7 +226,7 @@ test("private notes CRUD trims content and enforces ownership", async () => {
   const other = await signupUser("other@example.com");
   const ownerAuth = { authorization: `Bearer ${owner.body.token}` };
   const otherAuth = { authorization: `Bearer ${other.body.token}` };
-  const caseQuery = { path: ["FTS", "HPC", "456", "comments"] };
+  const caseQuery = { path: "FTS/HPC/456/comments" };
 
   const created = await call(cases, {
     method: "POST",
@@ -249,7 +249,7 @@ test("private notes CRUD trims content and enforces ownership", async () => {
   assert.equal(listed.status, 200);
   assert.equal(listed.body.comments.length, 1);
 
-  const commentQuery = { path: [...caseQuery.path, created.body.comment.id] };
+  const commentQuery = { path: `${caseQuery.path}/${created.body.comment.id}` };
   const forbidden = await call(cases, {
     method: "PATCH",
     headers: otherAuth,

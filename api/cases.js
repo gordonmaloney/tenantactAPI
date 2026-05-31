@@ -1,6 +1,6 @@
-import { getDb } from "../_db.js";
-import { setCors } from "../_cors.js";
-import { ensureAuth } from "../_auth.js";
+import { getDb } from "./_db.js";
+import { setCors } from "./_cors.js";
+import { ensureAuth } from "./_auth.js";
 import {
   ensureCaseIndexes,
   isValidCaseRef,
@@ -8,14 +8,16 @@ import {
   objectIdFromParam,
   serializeComment,
   validateCommentContent,
-} from "../_cases.js";
-import { getJsonBody, methodNotAllowed, parsePagination, sendJson } from "../_http.js";
+} from "./_cases.js";
+import { getJsonBody, methodNotAllowed, parsePagination, sendJson } from "./_http.js";
 
 function routeParts(req) {
   const path = req.query?.path;
-  if (Array.isArray(path)) return path.map((part) => String(part));
-  if (typeof path === "string" && path) return [path];
-  return [];
+  const raw = Array.isArray(path) ? path.join("/") : String(path || "");
+  return raw
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function caseRefFromParts(parts) {

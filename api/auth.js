@@ -1,5 +1,5 @@
-import { getDb } from "../_db.js";
-import { setCors } from "../_cors.js";
+import { getDb } from "./_db.js";
+import { setCors } from "./_cors.js";
 import {
   authRateLimit,
   createToken,
@@ -10,13 +10,13 @@ import {
   publicUser,
   validateEmail,
   verifyPassword,
-} from "../_auth.js";
-import { getJsonBody, methodNotAllowed, sendJson } from "../_http.js";
+} from "./_auth.js";
+import { getJsonBody, methodNotAllowed, sendJson } from "./_http.js";
 
 function routePath(req) {
   const path = req.query?.path;
   if (Array.isArray(path)) return path[0] || "";
-  return path || "";
+  return String(path || "").replace(/^\/+|\/+$/g, "");
 }
 
 async function signup(req, res) {
