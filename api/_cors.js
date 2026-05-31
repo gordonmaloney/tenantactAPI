@@ -34,7 +34,10 @@ export function setCors(req, res, options = {}) {
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-2F-Code"
+  );
 }
 
 export function handleCors(req, res, options = {}) {
