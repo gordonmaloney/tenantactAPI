@@ -2,7 +2,7 @@
 
 import crypto from "crypto";
 import { getDb } from "./_db.js";
-import { setCors } from "./_cors.js";
+import { handleCors } from "./_cors.js";
 
 function getClientIp(req) {
   const xff = req.headers["x-forwarded-for"];
@@ -85,13 +85,7 @@ function encryptObjectStringsShallow(obj) {
 /* ------------------------------ Handler -------------------------------- */
 
 export default async function handler(req, res) {
-  setCors(req, res);
-
-  if (req.method === "OPTIONS") {
-    // Preflight request
-    res.statusCode = 204;
-    return res.end();
-  }
+  if (handleCors(req, res)) return;
 
   if (req.method !== "POST") {
     res.statusCode = 405;

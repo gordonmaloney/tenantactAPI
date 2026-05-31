@@ -1,5 +1,5 @@
 import { getDb } from "./_db.js";
-import { setCors } from "./_cors.js";
+import { handleCors } from "./_cors.js";
 import {
   authRateLimit,
   createToken,
@@ -98,12 +98,7 @@ async function me(req, res) {
 }
 
 export default async function handler(req, res) {
-  setCors(req, res);
-
-  if (req.method === "OPTIONS") {
-    res.statusCode = 204;
-    return res.end();
-  }
+  if (handleCors(req, res)) return;
 
   try {
     const path = routePath(req);

@@ -1,7 +1,7 @@
 import { verifySync } from "otplib";
 import { getDb } from "./_db.js";
 import crypto from "crypto";
-import { setCors } from "./_cors.js";
+import { handleCors, setCors } from "./_cors.js";
 
 const PASSWORD = process.env.PASSWORD;
 const FETCH_2FA_SECRET = process.env.FETCH_2FA_SECRET;
@@ -9,18 +9,12 @@ const FETCH_2FA_SECRET = process.env.FETCH_2FA_SECRET;
 export default async function handler(req, res) {
   try {
     // CORS first
-    setCors(req, res);
+    if (handleCors(req, res)) return;
 
     // Debug headers to confirm deployed version
     res.setHeader("X-Debug-Method", req.method || "N/A");
     res.setHeader("X-Debug-Origin", req.headers.origin || "N/A");
     res.setHeader("X-Debug-2FA", FETCH_2FA_SECRET ? "active" : "disabled");
-
-    // ✅ Preflight must bypass auth
-    if (req.method === "OPTIONS") {
-      res.statusCode = 204;
-      return res.end();
-    }
 
     // 🔒 Auth AFTER OPTIONS
     const auth = req.headers.authorization;

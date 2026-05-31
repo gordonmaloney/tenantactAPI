@@ -1,7 +1,7 @@
 // api/track.js
 import crypto from "crypto";
 import { getDb } from "./_db.js";
-import { setCors } from "./_cors.js";
+import { handleCors } from "./_cors.js";
 
 function getClientIp(req) {
   // Vercel passes through X-Forwarded-For; take the first IP
@@ -22,15 +22,10 @@ function hashIp(ip) {
 
 export default async function handler(req, res) {
   // CORS first
-  setCors(req, res);
+  if (handleCors(req, res)) return;
 
   res.setHeader("X-Debug-Method", req.method || "N/A");
   res.setHeader("X-Debug-Origin", req.headers.origin || "N/A");
-
-  if (req.method === "OPTIONS") {
-    res.statusCode = 204;
-    return res.end();
-  }
 
   if (req.method !== "POST") {
     res.statusCode = 405;

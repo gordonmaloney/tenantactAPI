@@ -1,6 +1,7 @@
 // api/delete.js
 import { getDb } from "./_db.js";
 import { ObjectId } from "mongodb";
+import { handleCors } from "./_cors.js";
 
 // simple bearer auth: set EVENTS_API_PASSWORD in your env
 function checkAuth(req, res) {
@@ -25,9 +26,11 @@ async function getJsonBody(req) {
 }
 
 export default async function handler(req, res) {
+  if (handleCors(req, res)) return;
+
   if (req.method !== "DELETE") {
     res.statusCode = 405;
-    res.setHeader("Allow", "DELETE");
+    res.setHeader("Allow", "DELETE, OPTIONS");
     return res.end("Method Not Allowed");
   }
 
