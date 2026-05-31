@@ -64,9 +64,9 @@ The API should be accepting requests at `http://localhost:3000` or a similar URL
 
 ## Auth, saved tribunal cases, and comments
 
-This API supports user accounts, bearer-token authentication, per-user saved tribunal cases, and case comments for the Tribunal Scraper integration. On Vercel, these routes are served under `/api`; examples below use `http://localhost:3000/api`.
+This API supports user accounts, bearer-token authentication, per-user saved tribunal cases, and private per-user case notes for the Tribunal Scraper integration. On Vercel, these routes are served under `/api`; examples below use `http://localhost:3000/api`.
 
-To stay within Vercel Hobby function limits, the auth endpoints are implemented by one catch-all function at `api/auth/[...path].js`, and the saved-case/comment endpoints are implemented by one catch-all function at `api/cases/[...path].js`. The public URLs remain the REST-style paths documented below.
+To stay within Vercel Hobby function limits, the auth endpoints are implemented by one catch-all function at `api/auth/[...path].js`, and the saved-case/note endpoints are implemented by one catch-all function at `api/cases/[...path].js`. The public URLs remain the REST-style paths documented below.
 
 ### Environment variables
 
@@ -197,14 +197,15 @@ Response:
 { "caseRef": "FTS/HPC/123", "saved": false }
 ```
 
-### Case comments
+### Private case notes
 
-Comments are readable without authentication and paginated with `page` and `limit`. Creating, editing, and deleting comments requires authentication. Users can edit or delete only their own comments; users with `role: "admin"` can moderate any comment. Comment content is trimmed and otherwise stored unchanged.
+Case notes use the existing `/comments` URL shape, but they are private notes-to-self, not public comments. Reading, creating, editing, and deleting notes requires authentication. A user can only list, edit, or delete their own notes. Non-owners receive `404 comment_not_found` for edit/delete attempts so note existence is not leaked. Note content is trimmed and otherwise stored unchanged.
 
 #### GET /cases/:caseRef/comments
 
 ```
-curl "http://localhost:3000/api/cases/$CASE_REF/comments?page=1&limit=20"
+curl "http://localhost:3000/api/cases/$CASE_REF/comments?page=1&limit=20" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 #### POST /cases/:caseRef/comments
@@ -213,7 +214,7 @@ curl "http://localhost:3000/api/cases/$CASE_REF/comments?page=1&limit=20"
 curl -X POST "http://localhost:3000/api/cases/$CASE_REF/comments" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content":"This decision is useful for repairs evidence."}'
+  -d '{"content":"Remember to cite this decision for repairs evidence."}'
 ```
 
 Response:
@@ -223,7 +224,7 @@ Response:
   "comment": {
     "id": "665...",
     "caseRef": "FTS/HPC/123",
-    "content": "This decision is useful for repairs evidence.",
+    "content": "Remember to cite this decision for repairs evidence.",
     "createdAt": "2026-05-31T...",
     "updatedAt": "2026-05-31T...",
     "author": {
@@ -251,7 +252,7 @@ curl -X DELETE "http://localhost:3000/api/cases/$CASE_REF/comments/COMMENT_ID" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-Common errors are `400 invalid_case_ref`, `400 invalid_content`, `401 unauthorized`, `403 forbidden`, and `404 comment_not_found`.
+Common errors are `400 invalid_case_ref`, `400 invalid_content`, `401 unauthorized`, and `404 comment_not_found`.
 
 ### Tests
 

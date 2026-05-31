@@ -81,6 +81,9 @@ async function listOrCreateComments(req, res, parts, commentsIndex) {
     return methodNotAllowed(res, ["GET", "POST", "OPTIONS"]);
   }
 
+  const user = await ensureAuth(req, res);
+  if (!user) return;
+
   const caseRef = caseRefFromParts(parts.slice(0, commentsIndex));
   if (!isValidCaseRef(caseRef)) return sendJson(res, 400, { error: "invalid_case_ref" });
 
@@ -91,7 +94,7 @@ async function listOrCreateComments(req, res, parts, commentsIndex) {
     const { limit, page, skip } = parsePagination(req);
     const comments = await db
       .collection("case_comments")
-      .find({ caseRef })
+      .find({ caseRef, userId: user._id })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -102,9 +105,6 @@ async function listOrCreateComments(req, res, parts, commentsIndex) {
       comments: comments.map(serializeComment),
     });
   }
-
-  const user = await ensureAuth(req, res);
-  if (!user) return;
 
   const body = await getJsonBody(req);
   const content = validateCommentContent(body.content);
@@ -140,15 +140,12 @@ async function mutateComment(req, res, parts, commentsIndex) {
   const db = await getDb();
   await ensureCaseIndexes(db);
   const comments = db.collection("case_comments");
-  const existing = await comments.findOne({ _id: commentId, caseRef });
+  const existing = await comments.findOne({ _id: commentId, caseRef, userId: user._id });
 
   if (!existing) return sendJson(res, 404, { error: "comment_not_found" });
-  if (String(existing.userId) !== String(user._id) && user.role !== "admin") {
-    return sendJson(res, 403, { error: "forbidden" });
-  }
 
   if (req.method === "DELETE") {
-    await comments.deleteOne({ _id: commentId, caseRef });
+    await comments.deleteOne({ _id: commentId, caseRef, userId: user._id });
     return sendJson(res, 200, { deleted: true });
   }
 
@@ -157,7 +154,7 @@ async function mutateComment(req, res, parts, commentsIndex) {
   if (!content) return sendJson(res, 400, { error: "invalid_content" });
 
   const updatedAt = new Date();
-  await comments.updateOne({ _id: commentId, caseRef }, { $set: { content, updatedAt } });
+  await comments.updateOne({ _id: commentId, caseRef, userId: user._id }, { $set: { content, updatedAt } });
   return sendJson(res, 200, { comment: serializeComment({ ...existing, content, updatedAt }) });
 }
 

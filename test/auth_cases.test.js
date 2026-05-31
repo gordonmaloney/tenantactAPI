@@ -221,7 +221,7 @@ test("save, duplicate save prevention, unsave, and saved-case listing", async ()
   assert.equal(db.data.saved_cases.length, 0);
 });
 
-test("comments CRUD trims content and enforces ownership", async () => {
+test("private notes CRUD trims content and enforces ownership", async () => {
   const owner = await signupUser("owner@example.com");
   const other = await signupUser("other@example.com");
   const ownerAuth = { authorization: `Bearer ${owner.body.token}` };
@@ -238,7 +238,14 @@ test("comments CRUD trims content and enforces ownership", async () => {
   assert.equal(created.body.comment.content, "Keep this exact text.");
   assert.equal(created.body.comment.author.email, "owner@example.com");
 
-  const listed = await call(cases, { method: "GET", query: caseQuery });
+  const unauthenticatedList = await call(cases, { method: "GET", query: caseQuery });
+  assert.equal(unauthenticatedList.status, 401);
+
+  const otherList = await call(cases, { method: "GET", headers: otherAuth, query: caseQuery });
+  assert.equal(otherList.status, 200);
+  assert.equal(otherList.body.comments.length, 0);
+
+  const listed = await call(cases, { method: "GET", headers: ownerAuth, query: caseQuery });
   assert.equal(listed.status, 200);
   assert.equal(listed.body.comments.length, 1);
 
@@ -249,7 +256,7 @@ test("comments CRUD trims content and enforces ownership", async () => {
     query: commentQuery,
     body: { content: "Nope" },
   });
-  assert.equal(forbidden.status, 403);
+  assert.equal(forbidden.status, 404);
 
   const updated = await call(cases, {
     method: "PATCH",
@@ -265,7 +272,7 @@ test("comments CRUD trims content and enforces ownership", async () => {
     headers: otherAuth,
     query: commentQuery,
   });
-  assert.equal(deleteForbidden.status, 403);
+  assert.equal(deleteForbidden.status, 404);
 
   const deleted = await call(cases, {
     method: "DELETE",
