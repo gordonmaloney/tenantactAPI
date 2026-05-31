@@ -3,13 +3,8 @@ import { Readable } from "node:stream";
 import { beforeEach, test } from "node:test";
 import { ObjectId } from "mongodb";
 import { setTestDb } from "../api/_db.js";
-import signup from "../api/auth/signup.js";
-import login from "../api/auth/login.js";
-import me from "../api/auth/me.js";
-import savedCases from "../api/cases/saved.js";
-import saveCase from "../api/cases/[caseRef]/save.js";
-import comments from "../api/cases/[caseRef]/comments/index.js";
-import commentById from "../api/cases/[caseRef]/comments/[commentId].js";
+import auth from "../api/auth/[...path].js";
+import cases from "../api/cases/[...path].js";
 
 process.env.JWT_SECRET = "test-secret-with-at-least-thirty-two-characters";
 process.env.AUTH_RATE_LIMIT_MAX = "1000";
@@ -150,8 +145,9 @@ async function call(handler, options) {
 }
 
 async function signupUser(email, password = "correct horse battery staple") {
-  return call(signup, {
+  return call(auth, {
     method: "POST",
+    query: { path: ["signup"] },
     body: { email, password, name: "Test User" },
   });
 }
@@ -174,24 +170,27 @@ test("signup, login, /auth/me, and protected route access", async () => {
   const duplicate = await signupUser("user@example.com");
   assert.equal(duplicate.status, 409);
 
-  const badLogin = await call(login, {
+  const badLogin = await call(auth, {
     method: "POST",
+    query: { path: ["login"] },
     body: { email: "user@example.com", password: "wrong-password" },
   });
   assert.equal(badLogin.status, 401);
   assert.equal(badLogin.body.error, "invalid_credentials");
 
-  const loggedIn = await call(login, {
+  const loggedIn = await call(auth, {
     method: "POST",
+    query: { path: ["login"] },
     body: { email: "user@example.com", password: "correct horse battery staple" },
   });
   assert.equal(loggedIn.status, 200);
 
-  const denied = await call(me, { method: "GET" });
+  const denied = await call(auth, { method: "GET", query: { path: ["me"] } });
   assert.equal(denied.status, 401);
 
-  const profile = await call(me, {
+  const profile = await call(auth, {
     method: "GET",
+    query: { path: ["me"] },
     headers: { authorization: `Bearer ${loggedIn.body.token}` },
   });
   assert.equal(profile.status, 200);
@@ -201,22 +200,22 @@ test("signup, login, /auth/me, and protected route access", async () => {
 test("save, duplicate save prevention, unsave, and saved-case listing", async () => {
   const { body } = await signupUser("saves@example.com");
   const auth = { authorization: `Bearer ${body.token}` };
-  const query = { caseRef: "FTS%2FHPC%2F123" };
+  const query = { path: ["FTS", "HPC", "123", "save"] };
 
-  const saved = await call(saveCase, { method: "POST", headers: auth, query });
+  const saved = await call(cases, { method: "POST", headers: auth, query });
   assert.equal(saved.status, 200);
   assert.deepEqual(saved.body, { caseRef: "FTS/HPC/123", saved: true });
 
-  const duplicate = await call(saveCase, { method: "POST", headers: auth, query });
+  const duplicate = await call(cases, { method: "POST", headers: auth, query });
   assert.equal(duplicate.status, 200);
   assert.equal(db.data.saved_cases.length, 1);
 
-  const list = await call(savedCases, { method: "GET", headers: auth });
+  const list = await call(cases, { method: "GET", headers: auth, query: { path: ["saved"] } });
   assert.equal(list.status, 200);
   assert.equal(list.body.savedCases.length, 1);
   assert.equal(list.body.savedCases[0].caseRef, "FTS/HPC/123");
 
-  const unsaved = await call(saveCase, { method: "DELETE", headers: auth, query });
+  const unsaved = await call(cases, { method: "DELETE", headers: auth, query });
   assert.equal(unsaved.status, 200);
   assert.deepEqual(unsaved.body, { caseRef: "FTS/HPC/123", saved: false });
   assert.equal(db.data.saved_cases.length, 0);
@@ -227,9 +226,9 @@ test("comments CRUD trims content and enforces ownership", async () => {
   const other = await signupUser("other@example.com");
   const ownerAuth = { authorization: `Bearer ${owner.body.token}` };
   const otherAuth = { authorization: `Bearer ${other.body.token}` };
-  const caseQuery = { caseRef: "FTS%2FHPC%2F456" };
+  const caseQuery = { path: ["FTS", "HPC", "456", "comments"] };
 
-  const created = await call(comments, {
+  const created = await call(cases, {
     method: "POST",
     headers: ownerAuth,
     query: caseQuery,
@@ -239,12 +238,12 @@ test("comments CRUD trims content and enforces ownership", async () => {
   assert.equal(created.body.comment.content, "Keep this exact text.");
   assert.equal(created.body.comment.author.email, "owner@example.com");
 
-  const listed = await call(comments, { method: "GET", query: caseQuery });
+  const listed = await call(cases, { method: "GET", query: caseQuery });
   assert.equal(listed.status, 200);
   assert.equal(listed.body.comments.length, 1);
 
-  const commentQuery = { ...caseQuery, commentId: created.body.comment.id };
-  const forbidden = await call(commentById, {
+  const commentQuery = { path: [...caseQuery.path, created.body.comment.id] };
+  const forbidden = await call(cases, {
     method: "PATCH",
     headers: otherAuth,
     query: commentQuery,
@@ -252,7 +251,7 @@ test("comments CRUD trims content and enforces ownership", async () => {
   });
   assert.equal(forbidden.status, 403);
 
-  const updated = await call(commentById, {
+  const updated = await call(cases, {
     method: "PATCH",
     headers: ownerAuth,
     query: commentQuery,
@@ -261,14 +260,14 @@ test("comments CRUD trims content and enforces ownership", async () => {
   assert.equal(updated.status, 200);
   assert.equal(updated.body.comment.content, "Updated content");
 
-  const deleteForbidden = await call(commentById, {
+  const deleteForbidden = await call(cases, {
     method: "DELETE",
     headers: otherAuth,
     query: commentQuery,
   });
   assert.equal(deleteForbidden.status, 403);
 
-  const deleted = await call(commentById, {
+  const deleted = await call(cases, {
     method: "DELETE",
     headers: ownerAuth,
     query: commentQuery,

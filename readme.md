@@ -66,6 +66,8 @@ The API should be accepting requests at `http://localhost:3000` or a similar URL
 
 This API supports user accounts, bearer-token authentication, per-user saved tribunal cases, and case comments for the Tribunal Scraper integration. On Vercel, these routes are served under `/api`; examples below use `http://localhost:3000/api`.
 
+To stay within Vercel Hobby function limits, the auth endpoints are implemented by one catch-all function at `api/auth/[...path].js`, and the saved-case/comment endpoints are implemented by one catch-all function at `api/cases/[...path].js`. The public URLs remain the REST-style paths documented below.
+
 ### Environment variables
 
 Add these variables for the auth/case endpoints:
